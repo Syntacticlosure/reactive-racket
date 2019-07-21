@@ -1,7 +1,13 @@
 #lang racket
 (require syntax/parse/define)
 (provide (except-out (all-defined-out) after-schedule))
+
 (define after-schedule (make-parameter #f))
+
+(define-simple-macro (snapshot (behaviors-id:id ...) expr ...)
+  (let ([behaviors-id (send behaviors-id value-now)] ...)
+    expr ...))
+
 (define-simple-macro (run-behavior (behaviors-id:id ...) expr ...)
   #:with calc #'(let ([behaviors-id (send behaviors-id value-now)] ...)
                   expr ...)
