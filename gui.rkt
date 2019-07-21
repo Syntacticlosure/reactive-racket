@@ -48,7 +48,9 @@
         ['left-down (send left-clicks call me)]
         ['left-up (send left-releases call me)]
         ['right-down (send right-clicks call me)]
-        ['right-up (send right-releases call me)])
+        ['right-up (send right-releases call me)]
+        [_ (void)]
+        )
       )
     (define/override (on-char ke)
       (super on-char ke)
