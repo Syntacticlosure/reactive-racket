@@ -1,9 +1,27 @@
 #lang racket
+(require syntax/parse/define)
 (provide (all-defined-out))
+(define-simple-macro (run-behavior (behaviors-id:id ...) expr ...)
+  #:with calc #'(let ([behaviors-id (send behaviors-id value-now)] ...)
+                                           expr ...)
+  (let ([ret (new behavior% [init-value calc])])
+    (send behaviors-id add-listener (λ (v) (send ret call calc))) ...
+    ret))
+    
+(define (hold ev init)
+  (foldl-b (λ (v old) v) init ev))
+
 (define (map-e f evs)
   (define ret (new event-stream%))
   (send evs add-listener
         (λ (v) (send ret call (f v))))
+  ret)
+
+(define (filter-e p evs)
+  (define ret (new event-stream%))
+  (send evs add-listener
+        (λ (v) (when (p v)
+                 (send ret call v))))
   ret)
 
 (define (foldl-e op init evs)
