@@ -1,11 +1,18 @@
 #lang racket
 (require syntax/parse/define)
-(provide (all-defined-out))
+(provide (except-out (all-defined-out) after-schedule))
+(define after-schedule (make-parameter #f))
 (define-simple-macro (run-behavior (behaviors-id:id ...) expr ...)
   #:with calc #'(let ([behaviors-id (send behaviors-id value-now)] ...)
-                                           expr ...)
+                  expr ...)
   (let ([ret (new behavior% [init-value calc])])
-    (send behaviors-id add-listener (λ (v) (send ret call calc))) ...
+    (send behaviors-id add-listener (λ (v)
+                                      (if (after-schedule)
+                                          (after-schedule (cons (thunk 
+                                                                 (send ret call calc))
+                                                                (after-schedule))
+                                                                 )
+                                          (send ret call calc)))) ... 
     ret))
     
 (define (hold ev init)
@@ -56,8 +63,15 @@
     (define/public (add-listener lis)
       (set! listeners (cons lis listeners)))
     (define/public (call value)
-      (for-each (λ (f) (f value))
-                listeners))
+      (define after-do '())
+      (if (after-schedule)
+          (for-each (λ (f) (f value)) listeners)
+          (parameterize ([after-schedule '()])
+            (for-each (λ (f) (f value)) listeners)
+            (set! after-do (after-schedule))
+            ))
+      (for-each (λ (f) (f)) after-do)
+      )
     ))
 
 (define behavior%
@@ -71,6 +85,7 @@
       (super add-listener lis)
       (lis current-value))
     (define/override (call value)
+      (super call value)
       (set! current-value value)
-      (super call value))
+      )
     ))
