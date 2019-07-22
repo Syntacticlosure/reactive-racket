@@ -8,6 +8,7 @@
   (let ([behaviors-id (send behaviors-id value-now)] ...)
     expr ...))
 
+
 (define-simple-macro (run-behavior (behaviors-id:id ...) expr ...)
   #:with calc #'(let ([behaviors-id (send behaviors-id value-now)] ...)
                   expr ...)
