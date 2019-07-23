@@ -1,8 +1,11 @@
 #lang racket
 (require syntax/parse/define)
-(provide (except-out (all-defined-out) after-schedule))
+(provide (except-out (all-defined-out) this-level-computations))
 
-(define after-schedule (make-parameter #f))
+
+(define this-level-computations (make-parameter '()))
+(define next-level-computations (make-parameter '()))
+
 
 (define-simple-macro (snapshot (behaviors-id:id ...) expr ...)
   (let ([behaviors-id (send behaviors-id value-now)] ...)
@@ -12,14 +15,9 @@
 (define-simple-macro (run-behavior (behaviors-id:id ...) expr ...)
   #:with calc #'(let ([behaviors-id (send behaviors-id value-now)] ...)
                   expr ...)
-  (let ([ret (new behavior% [init-value calc])])
-    (send behaviors-id add-listener (λ (v)
-                                      (if (after-schedule)
-                                          (after-schedule (cons (thunk 
-                                                                 (send ret call calc))
-                                                                (after-schedule))
-                                                                 )
-                                          (send ret call calc)))) ... 
+  (let* ([ret (new behavior% [init-value calc])]
+         [calc-thunk (thunk (send ret call calc))])
+    (send behaviors-id add-listener (λ (v)(send ret call calc))) ... 
     ret))
     
 (define (hold ev init)
@@ -70,15 +68,21 @@
     (define/public (add-listener lis)
       (set! listeners (cons lis listeners)))
     (define/public (call value)
-      (define after-do '())
-      (if (after-schedule)
-          (for-each (λ (f) (f value)) listeners)
-          (parameterize ([after-schedule '()])
-            (for-each (λ (f) (f value)) listeners)
-            (set! after-do (after-schedule))
-            ))
-      (for-each (λ (f) (f)) after-do)
+      (parameterize ([next-level-computations (append
+                                               (map (λ (f) (thunk (f value))) listeners)
+                                               (next-level-computations))])
+        (if (null? (this-level-computations))
+            (if (null? (next-level-computations))
+                (void)
+                (let ([comp (car (next-level-computations))])
+                  (parameterize ([this-level-computations (cdr (next-level-computations))]
+                                 [next-level-computations '()])
+                    (comp))))
+            (let ([comp (car (this-level-computations))])
+              (parameterize ([this-level-computations (cdr (this-level-computations))])
+                (comp)))))
       )
+      
     ))
 
 (define behavior%
@@ -92,7 +96,12 @@
       (super add-listener lis)
       (lis current-value))
     (define/override (call value)
-      (super call value)
       (set! current-value value)
+      (super call value)
       )
     ))
+(define a (new behavior% [init-value 1]))
+(define b (run-behavior (a) a))
+(define c (run-behavior (a) (+ a 1)))
+(define d (run-behavior (b c) (+ b c)))
+(send d add-listener displayln)
