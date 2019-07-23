@@ -1,11 +1,22 @@
 #lang racket
 (require syntax/parse/define)
-(provide (except-out (all-defined-out) this-level-computations))
+(provide (except-out (all-defined-out) this-level-computations
+                     next-level-computations))
 
 
 (define this-level-computations (make-parameter '()))
 (define next-level-computations (make-parameter '()))
 
+(define (switch BBa)
+  (define ret (new behavior% [init-value (send (send BBa value-now) value-now)]))
+  (define current-behavior (send BBa value-now))
+  (define listener (λ (v) (send ret call v)))
+  (send current-behavior add-listener listener)
+  (send BBa add-listener (λ (new-behavior)
+                           (send current-behavior remove-listener listener)
+                           (set! current-behavior new-behavior)
+                           (send current-behavior add-listener listener)))
+  ret)
 
 (define-simple-macro (snapshot (behaviors-id:id ...) expr ...)
   (let ([behaviors-id (send behaviors-id value-now)] ...)
@@ -67,6 +78,8 @@
     (field [listeners '()])
     (define/public (add-listener lis)
       (set! listeners (cons lis listeners)))
+    (define/public (remove-listener lis)
+      (set! listeners (remq lis listeners)))
     (define/public (call value)
       (parameterize ([next-level-computations (append
                                                (map (λ (f) (thunk (f value))) listeners)
@@ -104,4 +117,4 @@
 (define b (run-behavior (a) a))
 (define c (run-behavior (a) (+ a 1)))
 (define d (run-behavior (b c) (+ b c)))
-(send d add-listener displayln)
+(send c add-listener displayln)
